@@ -22,6 +22,10 @@ train <- train %>%
 test <- test %>%
   mutate_each(funs(factor), c(X0,X1,X2,X3,X4,X5,X6,X8))
 
+# Remove an outlier
+train <- train %>%
+  filter(y < 250)
+
 
 train2=train
 nr=nrow(train2)
@@ -42,21 +46,24 @@ full$X8<-as.integer(full$X8)
 full2=as.matrix(full)
 storage.mode(full2)<-"numeric"
 full_matrix <- xgb.DMatrix(data = full2[1:nr,], label = train$y)
-depth=as.matrix(c(2,3,4))
-etaF=as.matrix(c(0.3,0.5,0.7,0.9))
+depth=as.matrix(c(2,3))
+# etaF=as.matrix(c(0.3,0.5,0.7,0.9))
+etaF=as.matrix(c(0.005, 0.01, 0.02))
 oosrmse=array(1,c(nrow(depth),nrow(etaF)))
 oosindex=array(1,c(nrow(depth),nrow(etaF)))
 for (j in 1:nrow(depth))
 { 
   for (k in 1:nrow(etaF))
   {
-    bst_f <- xgb.cv(data = full_matrix, max.depth = depth[j], eta = etaF[k], nthread = 2, nround = 8,  nfold=20, objective = "reg:linear")
+    bst_f <- xgb.cv(data = full_matrix, max.depth = depth[j], eta = etaF[k], nthread = 2, nround = 1000,  nfold=5, objective = "reg:linear")
     oosrmse[j,k]=min(bst_f$evaluation_log$test_rmse_mean)
     oosindex[j,k]=which((bst_f$evaluation_log$test_rmse_mean==min(bst_f$evaluation_log$test_rmse_mean)))
   }
 }
 
-bstF <- xgboost(data = full_matrix, max.depth = 4, eta = 0.95, nthread = 2, nround = 3, objective = "reg:linear")
+# Why is the out-in-sample performance so poor - drop the outlier.
+
+bstF <- xgboost(data = full_matrix, max.depth = 2, eta = 0.01, nthread = 2, nround = 700, objective = "reg:linear")
 names = dimnames(full_matrix)[[2]]
 importance_matrix = xgb.importance(names, model=bstF)
 gp = xgb.plot.importance(importance_matrix[1:15,])
